@@ -8,9 +8,12 @@ import (
 	"log"
 	"os"
 	"strings"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/client9/reopen"
 )
 
 // Config configures the log levels
@@ -68,7 +71,7 @@ func (l *Config) Init() error {
 	case "":
 		return fmt.Errorf("Unknown output type '%s'", l.Output)
 	default:
-		output, err = os.OpenFile(l.Output, os.O_WRONLY | os.O_CREATE, 0755)
+		output, err = reopen.NewFileWriter(l.Output)
 		if err != nil {
 			return fmt.Errorf("Error initializing log file '%s': %s", l.Output, err)
 		}
@@ -85,6 +88,21 @@ type DefaultLogFormatter struct {
 
 // RFC3339logWriter io.Writer that outputs RFC3339 dates
 type RFC3339logWriter struct {
+}
+
+func initializeSignal(f *reopen.FileWriter) {
+	// Handle SIGUSR1
+	//
+	// channel is number of signals needed to catch  (more or less)
+	// we only are working with one here, SIGUSR1
+	sighup := make(chan os.Signal, 1)
+	signal.Notify(sighup, syscall.SIGUSR1)
+	go func() {
+		for {
+			<-sighup
+			f.Reopen()
+		}
+	}()
 }
 
 func (writer RFC3339logWriter) Write(bytes []byte) (int, error) {
