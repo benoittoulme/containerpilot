@@ -65,8 +65,13 @@ func (l *Config) Init() error {
 		output = os.Stderr
 	case "stdout":
 		output = os.Stdout
-	default:
+	case "":
 		return fmt.Errorf("Unknown output type '%s'", l.Output)
+	default:
+		output, err = os.OpenFile(l.Output, os.O_WRONLY | os.O_CREATE, 0755)
+		if err != nil {
+			return fmt.Errorf("Error initializing log file '%s': %s", l.Output, err)
+		}
 	}
 	logrus.SetLevel(level)
 	logrus.SetFormatter(formatter)
